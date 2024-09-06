@@ -1,0 +1,58 @@
+workflow:
+  name: '${CI_PROJECT_NAME} ⌥ $CI_COMMIT_BRANCH'
+  auto_cancel:
+    on_new_commit: interruptible
+
+default:
+  interruptible: true
+  tags:
+    - prod
+
+stages:
+  - build
+  - deploy
+
+Build:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+  before_script:
+    - |
+      if docker image ls --format "{{.Repository}}" | grep -q 'slackbot:latest'; then
+        docker image rmi slackbot
+        echo "The docker image removal was successful."
+      else
+        echo "Not Found images."
+      fi
+  script:
+    - docker build -t slackbot:latest -f $CI_PROJECT_DIR/docker/dockerfile ..
+  only:
+    - main
+
+Deploy:
+  stage: deploy
+  image: docker:latest
+  variables:
+    DOCKER_DRIVER: overlay2
+  services:
+    - docker:dind
+  before_script:
+    - |
+      if docker ps -a --format "{{.Names}}" | grep -q 'slackbot_container'; then
+        cd $CI_PROJECT_DIR/docker;
+        docker compose down;
+        echo "The container removal was successful."
+      else
+        echo "Not Found container."
+      fi
+  script:
+    - cd $CI_PROJECT_DIR/docker
+    - docker compose up -d
+    - docker rmi $(docker images -f "dangling=true" -q) --force
+  needs: [Build]
+  only:
+    - main
+
