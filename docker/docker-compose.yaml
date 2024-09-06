@@ -1,0 +1,19 @@
+x-default-logging: &logging
+  driver: 'loki'
+  options:
+    loki-url : "http://localhost:3100/loki/api/v1/push"
+
+services:
+  slackbot:
+    image: slackbot:latest
+    container_name: slackbot_container
+    build:
+      context: .
+      dockerfile: dockerfile
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    tty: true
+    restart: always
+    logging: *logging
+    privileged: true
